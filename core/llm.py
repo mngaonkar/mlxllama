@@ -38,7 +38,7 @@ def generate(model,
             repetition_window: int = 25,
             logprobes: bool = False,
             token_ids: bool = False,
-            flush: int = 0,
+            flush: int = 5,
             extra_stop_tokens: list = None,
             prompt_cache = None,
             logit_filter = None,
@@ -46,7 +46,7 @@ def generate(model,
     """Generate."""
     start = time.perf_counter()
     logger.info("Generating text...")
-    inputs = mx.array(tokenizer.encode(text))
+    inputs = mx.array(tokenizer.encode(prompt))
 
     stop_tokens = tokenizer.special_ids
     tokens, text = [], ""
@@ -101,11 +101,26 @@ def generate(model,
             yield y, p
     
     for (token, p), i in zip(generate_step(model, inputs), range(max_tokens)):
+        if i == 0:
+            mx.eval(token)
+        
+        if token.item() in stop_tokens:
+            break
+        
+        tokens.append(token.item())
+        if (len(tokens) % flush) == 0:
+            mx.eval(tokens)
+            text_offset = len(text)
+            text = tokenizer.decode(tokens)
+
+            yield text[text_offset:], None
 
 
     mx.async_eval(tokens)
     text_offset = len(text)
     text = tokenizer.decode(tokens)
+
+    yield text[text_offset:], None
 
 
 
