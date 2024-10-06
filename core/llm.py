@@ -7,6 +7,7 @@ from core.tokenizer import Tokenizer
 from mlx_lm.models.base import KVCache
 import mlx.nn as nn
 import mlx.core as mx
+from mlx.utils import tree_flatten, tree_unflatten
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +17,11 @@ class LLM():
     }
 
     def __init__(self, 
+                 tokenizer: Tokenizer,
                  args: ModelArgs) -> None:
         self.args = args
         self.model = self._get_model_class(args.model_name)(args)
+        self.tokenizer = tokenizer
 
     def _get_model_class(self, name: str):
         """Get model class."""
@@ -27,6 +30,43 @@ class LLM():
         else:
             raise ValueError(f"Model {name} not found.")
         
+    def quantize(self,
+                 group_size: int = 32,
+                 bits: int = 4,
+                 weights:dict = None):
+        """Quantize model."""
+        self.model = nn.quantize(self.model, group_size=group_size, bits=bits, weights=weights)
+
+    def verify_weights(self, 
+                       weights: dict):
+        """Verify weights."""
+        model_params = tree_flatten(self.model.parameters())
+        result = True
+
+        for name, weight in model_params:
+            if name not in weights:
+                result = False
+                logger.warning(f"Weight {name} not found in weights.")
+            elif weight.shape != weights[name].shape:
+                result = False
+                logger.warning(f"Shape mismatch for {name}: {weight.shape} != {weights[name].shape}")
+        
+        model_keys = {name for name, _ in model_params}
+        for name in weights:
+            if name not in model_keys:
+                result = False
+                logger.warning(f"Weight {name} not found in model.")
+        
+        return result
+    
+    def update_weights(self,
+                       weights: dict,
+                       mapping: dict = None):
+        """Update weights."""
+        weights = tree_unflatten(list(weights.items()))
+        self.model.update(weights)
+        mx.eval(self.model.parameters())
+
 def generate(model,
             tokenizer: Tokenizer,
             prompt: str,

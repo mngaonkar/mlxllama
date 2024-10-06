@@ -4,6 +4,8 @@ import enum
 from core.llm import LLM
 import pathlib
 import logging
+from core.mapping import map_config, map_key
+from core.tokenizer import GGUFTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +56,52 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
     logger.info(f"Loading GGUF model from {model_path}...")
     gguf_weigthts, metadata = mx.load(model_path, return_metadata=True)
 
+    config = map_config(metadata)
+    model_args = ModelArgs.load_config(config)
+
     weights = {}
     mapping = {}
 
+    # Map keys
+    logger.info("Mapping keys...")
     for k, v in gguf_weigthts.items():
         mlx_key = map_key(k)
+        mapping[mlx_key] = k    
+
+        if mlx_key is None:
+            logger.warning(f"Skipping key {k}")
+        else:
+            weights[mlx_key] = v
+
+    # Load quantization
+    gguf_file_type = metadata.get("general.file_type", "unknown")
+    logger.info(f"GGUF file type: {gguf_file_type}")
+
+    quantization = None
+    if gguf_file_type == 0 or gguf_file_type == 1:
+        logger.info("No quantization found.")
+    elif gguf_file_type == 2 or gguf_file_type == 3:
+        logger.info("Quantization found.")
+        quantization = {"group_size": 32, "bits": 4}
+    elif gguf_file_type == 7:
+        logger.info("Quantization found.")
+        quantization = {"group_size": 32, "bits": 8}
+    else:
+        logger.warning(f"Unknown file type {gguf_file_type}")
+
+    model_args.quantization = quantization
+
+    tokenizer = GGUFTokenizer(metadata)
+    logger.info(f"Tokenizer loaded from {model_path}")
+
+    model = LLM(model_args)
+
+    if quantization is not None:
+        logger.info("Quantizing model...")
+        model.quantize(group_size=quantization["group_size"], bits=quantization["bits"], weights=weights)
+
+    model.verify_weights(weights)
+    model.update_weights(weights, mapping=mapping)
+
+    total_params = model.get_size()
+    logger.info(f"Model loaded with {total_params/10**9:.2f}B parameters.")

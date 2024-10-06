@@ -30,3 +30,22 @@ class ModelArgs():
 
     def __repr__(self) -> str:
         return str(dataclasses.asdict(self))
+
+    @staticmethod
+    def load_config(self, config):
+        ArgClass = None
+
+        if 'model_type' in config:
+            if config['model_type'] in ['llama', 'mistral', 'gemma']:
+                ArgClass = LlamaArgs
+
+        if ArgClass is None:
+            ArgClass = LlamaArgs
+
+        ArgClass.update() 
+        config = {k:v for k,v in config.items() if k in ArgClass.__dataclass_fields__}
+
+        return ArgClass(**config)
+
+class LlamaArgs(ModelArgs):
+    rope_scaling: dict = None
