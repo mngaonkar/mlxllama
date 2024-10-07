@@ -9,6 +9,7 @@ import mlx.nn as nn
 import mlx.core as mx
 from mlx.utils import tree_flatten, tree_unflatten
 import models.llama
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class LLM():
                  tokenizer: Tokenizer,
                  args: ModelArgs) -> None:
         self.args = args
-        self.model = self._get_model_class(args.model_name)(args)
+        self.model = self._get_model_class(args.model_type)(args)
         self.tokenizer = tokenizer
 
     def _get_model_class(self, name: str):
@@ -59,6 +60,13 @@ class LLM():
                 logger.warning(f"Weight {name} not found in model.")
         
         return result
+    
+    def get_size(self):
+        """Get size."""
+        pp_flat = tree_flatten(self.model.parameters()) # each element in the list is [name, tensor]
+        params = sum([p[1].size for p in pp_flat])
+
+        return params
     
     def update_weights(self,
                        weights: dict,

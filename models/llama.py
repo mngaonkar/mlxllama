@@ -11,7 +11,7 @@ from sentencepiece import SentencePieceProcessor
 class Model(BaseModel):
     """Model class for LLM."""
     def __init__(self, args: ModelArgs):
-        super().__init__()
+        super().__init__(args)
         self.args = args
         self.n_layers = args.n_layers
         self.vocab_size = args.vocab_size
@@ -19,7 +19,7 @@ class Model(BaseModel):
         self.layers = [TransformerBlock(args=args) for _ in range(args.n_layers)]
         self.norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
         self.model_path = None # TODO: fix model path
-        self.tokenizer = SentencePieceProcessor(model_file=str(self.model_path / "tokenizer.model"))
+        # self.tokenizer = SentencePieceProcessor(model_file=str(self.model_path / "tokenizer.model"))
 
         if args.tie_word_embeddings:
             self.output = None
