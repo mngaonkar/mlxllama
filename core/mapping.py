@@ -118,6 +118,9 @@ def map_config(config):
                     value = value.item()
                 result[key_map[key]] = value
         
+        if "general.name" in config:
+            result["model_name"] = config["general.name"]
+            
         if "general.architecture" in config:
             result["model_type"] = config["general.architecture"]
             

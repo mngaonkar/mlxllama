@@ -32,20 +32,22 @@ class ModelArgs():
         return str(dataclasses.asdict(self))
 
     @staticmethod
-    def load_config(self, config):
+    def load_config(config):
         ArgClass = None
 
+        logger.info(f"Loading model type: {config['model_type']}")
         if 'model_type' in config:
             if config['model_type'] in ['llama', 'mistral', 'gemma']:
                 ArgClass = LlamaArgs
 
         if ArgClass is None:
+            logger.warning(f"Model type {config['model_type']} not recognized. Using default LlamaArgs.")
             ArgClass = LlamaArgs
 
-        ArgClass.update() 
         config = {k:v for k,v in config.items() if k in ArgClass.__dataclass_fields__}
 
         return ArgClass(**config)
 
+@dataclasses.dataclass
 class LlamaArgs(ModelArgs):
     rope_scaling: dict = None

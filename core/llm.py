@@ -8,6 +8,7 @@ from mlx_lm.models.base import KVCache
 import mlx.nn as nn
 import mlx.core as mx
 from mlx.utils import tree_flatten, tree_unflatten
+import models.llama
 
 logger = logging.getLogger(__name__)
 

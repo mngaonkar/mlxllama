@@ -6,7 +6,7 @@ from functools import partial
 
 logger = logging.getLogger(__name__)
 
-@partial(mx.compile, shapless=True)
+@partial(mx.compile, shapeless=True)
 def relu2(x):
     return nn.relu(x).square()
 

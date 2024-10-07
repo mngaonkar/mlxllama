@@ -7,6 +7,7 @@ import logging
 from core.mapping import map_config, map_key
 from core.tokenizer import GGUFTokenizer
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ModelFormat(enum.Enum):
@@ -43,12 +44,12 @@ def load_model_dir(model_path: pathlib.Path) -> LLM:
     """Load model from directory."""
     pass
 
-def load_model_file(model_path: pathlib.Path) -> LLM:
+def load_model_file(model_path: str) -> LLM:
     """Load model from file."""
     model_path = pathlib.Path(model_path)
 
-    if model_path.suffix == "gguf":
-        return load_gguf_file(model_path)
+    if model_path.suffix == ".gguf":
+        return load_gguf_file(str(model_path))
     else:
         raise ValueError(f"Model format {model_path.suffix} not supported.")
     
@@ -91,7 +92,7 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
 
     model_args.quantization = quantization
 
-    tokenizer = GGUFTokenizer(metadata)
+    tokenizer = GGUFTokenizer(model_path, metadata)
     logger.info(f"Tokenizer loaded from {model_path}")
 
     model = LLM(model_args)
@@ -105,3 +106,5 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
 
     total_params = model.get_size()
     logger.info(f"Model loaded with {total_params/10**9:.2f}B parameters.")
+
+    return model
