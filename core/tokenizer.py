@@ -3,6 +3,8 @@ from typing import List
 import pathlib
 import transformers
 from sentencepiece import SentencePieceProcessor
+import mlx.core as mx
+from utils import spm_tokenizer
 
 class Tokenizer():
     """Tokenizer class."""
@@ -92,7 +94,8 @@ class TransformerTokenizer(Tokenizer):
         self.model.save_pretrained(tokenizer_dir)
 
       
-class GGUFTokenizer(Tokenizer):
+class GGUFTokenizerFromModel(Tokenizer):
+    """GGUF Tokenizer from model."""
     def __init__(self,
                  model_path: str,
                  metadata: dict) -> None:
@@ -121,3 +124,19 @@ class GGUFTokenizer(Tokenizer):
 
     def decode(self, tokens: List[int]) -> str:
         return self.model.decode(tokens)
+    
+
+class GGUFTokenizer(Tokenizer):
+    """GGUF Tokenizer from metadata."""
+    def __init__(self, metadata):
+        self._tokenizer = spm_tokenizer.spm_tokenizer(metadata)
+
+    def encode(self, s: str) -> mx.array:
+        return mx.array([self._tokenizer.bos_id()] + self._tokenizer.encode(s))
+
+    @property
+    def eos_token_id(self):
+        return self._tokenizer.eos_id()
+
+    def decode(self, toks: List[int]) -> str:
+        return self._tokenizer.decode(toks)

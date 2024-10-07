@@ -92,7 +92,7 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
 
     model_args.quantization = quantization
 
-    tokenizer = GGUFTokenizer(model_path, metadata)
+    tokenizer = GGUFTokenizer(metadata)
     logger.info(f"Tokenizer loaded from {model_path}")
 
     model = LLM(model_args)
