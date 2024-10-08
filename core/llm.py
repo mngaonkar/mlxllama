@@ -10,6 +10,7 @@ import mlx.core as mx
 from mlx.utils import tree_flatten, tree_unflatten
 import models.llama
 import numpy as np
+from mlx_lm import sample_utils
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ def generate(model,
     start = time.perf_counter()
     logger.info("Generating text...")
     inputs = mx.array(tokenizer.encode(prompt))
+    logger.info(f"input encoded: {inputs}")
 
     stop_tokens = tokenizer.special_ids
     tokens, text = [], ""
@@ -122,12 +124,12 @@ def generate(model,
                 logits = logits * repetition_penalty
             
             if top_k > 0:
-                logits = mx.top_k(logits, k=top_k)
+                logits = mx.topk(logits, k=top_k)
 
             if top_p > 0.0:
-                logits = mx.top_p(logits, p=top_p)
+                logits = sample_utils.top_p_sampling(logits, top_p=top_p, temperature=temperature)
 
-            y = mx.random.categorical(logits, 1)
+            y = mx.random.categorical(logits)
 
         p = 0.0
         if logprobes:
@@ -166,6 +168,7 @@ def generate(model,
             break
         
         tokens.append(token.item())
+        logger.info(f"Token appended: {token.item()}")
         if (len(tokens) % flush) == 0:
             mx.eval(tokens)
             text_offset = len(text)

@@ -42,7 +42,7 @@ class Model(BaseModel):
         if cache is None:
             cache = [None] * self.n_layers
 
-        logger.info(f"Cache: {cache}")
+        # logger.info(f"Cache: {cache}")
         for i, layer in enumerate(self.layers):
             h = layer.forward(h, mask, cache)
         
@@ -74,7 +74,8 @@ class Attention(nn.Module):
                  mask: Optional[mx.array] = None,
                  cache: Optional[KVCache] = None) -> mx.array:
         """Forward pass."""
-        B, L, _ = input.shape
+        mx.eval(input)
+        B, L, D = input.shape
 
         queries, keys, values = self.wq(input), self.wk(input), self.wv(input)
 
@@ -113,7 +114,7 @@ class FeedForward(nn.Module):
     def __call__(self, 
                  input: mx.array) -> mx.array:
         """Forward pass."""
-        return self.w2(self.act(self.w1(input))) * self.w3(input)
+        return self.w2(self.act(self.w1(input)) * self.w3(input))
 
 class TransformerBlock(nn.Module):
     """Transformer block."""
@@ -125,7 +126,7 @@ class TransformerBlock(nn.Module):
 
         self.attention = Attention(args)
         self.feed_forward = FeedForward(args)
-        self.attention_norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
+        self.attention_norm = nn.RMSNorm(args.hidden_dim, eps=args.norm_eps)
         self.ff_norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
 
     def forward(self, 

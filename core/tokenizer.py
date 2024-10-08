@@ -137,6 +137,15 @@ class GGUFTokenizer(Tokenizer):
     @property
     def eos_token_id(self):
         return self._tokenizer.eos_id()
+    
+    @property
+    def bos_token_id(self):
+        return self._tokenizer.bos_id()
 
     def decode(self, toks: List[int]) -> str:
         return self._tokenizer.decode(toks)
+    
+    @property
+    def special_ids(self) -> set:
+        """Special IDs."""
+        return set([self.bos_token_id, self.eos_token_id])
