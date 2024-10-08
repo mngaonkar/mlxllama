@@ -28,7 +28,7 @@ class Tokenizer():
         
     @property
     def special_ids(self) -> set:
-        return set([self.bos_id, self.eos_id])
+        return NotImplementedError("Tokenizer must implement special_ids property")
     
 
 class TransformerTokenizer(Tokenizer):

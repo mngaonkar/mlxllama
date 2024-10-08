@@ -7,6 +7,9 @@ from models.activation import init_activation
 from models.rope import init_rope
 from models.base import BaseModel
 from sentencepiece import SentencePieceProcessor
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Model(BaseModel):
     """Model class for LLM."""
@@ -39,8 +42,9 @@ class Model(BaseModel):
         if cache is None:
             cache = [None] * self.n_layers
 
+        logger.info(f"Cache: {cache}")
         for i, layer in enumerate(self.layers):
-            h = layer.forward(h, mask, cache[i])
+            h = layer.forward(h, mask, cache)
         
         if self.output is None:
             return self.tok_embeddings.as_linear(self.norm(h))
@@ -72,7 +76,7 @@ class Attention(nn.Module):
         """Forward pass."""
         B, L, _ = input.shape
 
-        queries, keys, values = self.wq(x), self.wk(x), self.wv(x)
+        queries, keys, values = self.wq(input), self.wk(input), self.wv(input)
 
         queries = queries.reshape(B, L, self.n_heads, -1).transpose(0, 2, 1, 3)
         keys = keys.reshape(B, L, self.n_kv_heads, -1).transpose(0, 2, 1, 3)

@@ -76,6 +76,15 @@ class LLM():
         self.model.update(weights)
         mx.eval(self.model.parameters())
 
+    def completion(self, *args, **kwargs):
+        """Completion."""
+        response = ""
+
+        for text, metadata in generate(self.model, self.tokenizer, *args, **kwargs):
+            response += text
+
+        return response, metadata    
+
 def generate(model,
             tokenizer: Tokenizer,
             prompt: str,
@@ -133,7 +142,7 @@ def generate(model,
             logits, cache = prompt_cache.get(inputs)
         
         if logits is None:
-            cache = KVCache.for_model(model)
+            cache = KVCache(model.args.head_dim, model.args.n_kv_heads)
             logits = model(inputs[None], cache)
             logits = logits[:, -1, :]
 
