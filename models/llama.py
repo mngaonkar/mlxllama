@@ -75,6 +75,7 @@ class Attention(nn.Module):
                  cache: Optional[KVCache] = None) -> mx.array:
         """Forward pass."""
         mx.eval(input)
+        logger.info(f"input shape: {input.shape}")
         B, L, D = input.shape
 
         queries, keys, values = self.wq(input), self.wk(input), self.wv(input)

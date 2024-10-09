@@ -12,6 +12,7 @@ import models.llama
 import numpy as np
 from mlx_lm import sample_utils
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class LLM():
@@ -106,12 +107,14 @@ def generate(model,
     start = time.perf_counter()
     logger.info("Generating text...")
     inputs = mx.array(tokenizer.encode(prompt))
+    logger.info(f"input encoded length: {len(inputs)}")
     logger.info(f"input encoded: {inputs}")
 
     stop_tokens = tokenizer.special_ids
     tokens, text = [], ""
 
     def sample(logits):
+        """Sample."""
         if temperature == 0.0:
             y = mx.argmax(logits, axis=-1)
         else:
@@ -137,15 +140,20 @@ def generate(model,
         
         return y, p
 
-    def generate_step(model, inputs):
+    def generate_step(model: nn.Module, 
+                      inputs: mx.array):
         logits = None
 
         if prompt_cache is not None:
             logits, cache = prompt_cache.get(inputs)
         
         if logits is None:
+            logger.debug("Cache miss.")
             cache = KVCache(model.args.head_dim, model.args.n_kv_heads)
             logits = model(inputs[None], cache)
+            logger.debug(f"logits shape: {logits.shape}")
+            logger.debug(f"logits: {logits}")
+
             logits = logits[:, -1, :]
 
             if prompt_cache is not None:
@@ -155,12 +163,16 @@ def generate(model,
 
         while True:
             logits = model(y[None], cache)
+            logger.debug(f"logits shape: {logits.shape}")
+            logger.debug(f"logits: {logits}")
             logits = logits[:, -1, :]
 
             y, p = sample(logits)
             yield y, p
     
     for (token, p), i in zip(generate_step(model, inputs), range(max_tokens)):
+        logger.debug(f"Token: {token.item()}, p: {p}, i: {i}")
+
         if i == 0:
             mx.eval(token)
         
@@ -168,7 +180,7 @@ def generate(model,
             break
         
         tokens.append(token.item())
-        logger.info(f"Token appended: {token.item()}")
+        logger.debug(f"Token appended: {token.item()}")
         if (len(tokens) % flush) == 0:
             mx.eval(tokens)
             text_offset = len(text)
