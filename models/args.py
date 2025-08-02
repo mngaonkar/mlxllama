@@ -8,6 +8,7 @@ class ModelArgs():
     """Model arguments."""
     model_type: str
     model_name: str
+    model_path: str
     dim: int
     n_layers: int
     head_dim: int

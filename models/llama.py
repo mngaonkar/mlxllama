@@ -2,7 +2,6 @@ from typing import Optional
 import mlx.core as mx
 import mlx.nn as nn
 from models.args import ModelArgs
-from mlx_lm.models.base import KVCache
 from models.activation import init_activation
 from models.rope import init_rope
 from models.base import BaseModel
@@ -10,6 +9,25 @@ from sentencepiece import SentencePieceProcessor
 import logging
 
 logger = logging.getLogger(__name__)
+
+class KVCache:
+    def __init__(self, head_dim: int, n_kv_heads: int):
+        self.head_dim = head_dim
+        self.n_kv_heads = n_kv_heads
+        self.keys = None
+        self.values = None
+        self.offset = 0
+        
+    def update_and_fetch(self, keys, values):
+        if self.keys is None:
+            self.keys = keys
+            self.values = values
+        else:
+            self.keys = mx.concatenate([self.keys, keys], axis=-2)
+            self.values = mx.concatenate([self.values, values], axis=-2)
+        
+        self.offset += keys.shape[-2]
+        return self.keys, self.values
 
 class Model(BaseModel):
     """Model class for LLM."""
@@ -21,8 +39,8 @@ class Model(BaseModel):
         self.tok_embeddings = nn.Embedding(args.vocab_size, args.dim)
         self.layers = [TransformerBlock(args=args) for _ in range(args.n_layers)]
         self.norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
-        self.model_path = None # TODO: fix model path
-        # self.tokenizer = SentencePieceProcessor(model_file=str(self.model_path / "tokenizer.model"))
+        self.model_path = args.model_path
+        self.tokenizer = SentencePieceProcessor(model_file=str(self.model_path / "tokenizer.model"))
 
         if args.tie_word_embeddings:
             self.output = None
@@ -42,9 +60,9 @@ class Model(BaseModel):
         if cache is None:
             cache = [None] * self.n_layers
 
-        # logger.info(f"Cache: {cache}")
+        logger.info(f"Cache: {cache}")
         for i, layer in enumerate(self.layers):
-            h = layer.forward(h, mask, cache)
+            h = layer.forward(h, mask, cache[i])
         
         if self.output is None:
             return self.tok_embeddings.as_linear(self.norm(h))
@@ -122,12 +140,12 @@ class TransformerBlock(nn.Module):
     def __init__(self, args: ModelArgs):
         super().__init__()
         self.args = args
-        self_n_heads = args.n_heads
+        self.n_heads = args.n_heads
         self.dim = args.dim
 
         self.attention = Attention(args)
         self.feed_forward = FeedForward(args)
-        self.attention_norm = nn.RMSNorm(args.hidden_dim, eps=args.norm_eps)
+        self.attention_norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
         self.ff_norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
 
     def forward(self, 

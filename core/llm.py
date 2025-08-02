@@ -4,9 +4,8 @@ import models
 import time
 import mlx.core as mx
 from core.tokenizer import Tokenizer
-from mlx_lm.models.base import KVCache
+from models.llama import KVCache
 import mlx.nn as nn
-import mlx.core as mx
 from mlx.utils import tree_flatten, tree_unflatten
 import models.llama
 import numpy as np
@@ -71,8 +70,7 @@ class LLM():
         return params
     
     def update_weights(self,
-                       weights: dict,
-                       mapping: dict = None):
+                       weights: dict):
         """Update weights."""
         weights = tree_unflatten(list(weights.items()))
         self.model.update(weights)
@@ -106,11 +104,16 @@ def generate(model,
     """Generate."""
     start = time.perf_counter()
     logger.info("Generating text...")
-    inputs = mx.array(tokenizer.encode(prompt))
+    encoded = tokenizer.encode(prompt)
+    if not encoded:
+        raise ValueError("Failed to encode prompt or prompt is empty")
+    inputs = mx.array(encoded)
     logger.info(f"input encoded length: {len(inputs)}")
     logger.info(f"input encoded: {inputs}")
 
     stop_tokens = tokenizer.special_ids
+    if extra_stop_tokens:
+        stop_tokens.extend(extra_stop_tokens)
     tokens, text = [], ""
 
     def sample(logits):
@@ -123,11 +126,12 @@ def generate(model,
             if logit_filter is not None:
                 logits = logit_filter(logits)
             
-            if len(tokens) > 0 and repetition_penalty is not None:
-                logits = logits * repetition_penalty
+            if len(tokens) > 0 and repetition_penalty != 1.0:
+                for token in tokens[-repetition_window:]:
+                    logits[0, token] = logits[0, token] / repetition_penalty
             
             if top_k > 0:
-                logits = mx.topk(logits, k=top_k)
+                logits = sample_utils.top_k_sampling(logits, top_k=top_k)
 
             if top_p > 0.0:
                 logits = sample_utils.top_p_sampling(logits, top_p=top_p, temperature=temperature)
@@ -194,8 +198,4 @@ def generate(model,
     text = tokenizer.decode(tokens)
 
     yield text[text_offset:], None
-
-
-
-
 
