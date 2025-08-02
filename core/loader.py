@@ -58,6 +58,8 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
     gguf_weigthts, metadata = mx.load(model_path, return_metadata=True)
 
     config = map_config(metadata)
+    config['model_path'] = str(model_path)
+    logger.info(f"Config: {config}")
     model_args = ModelArgs.load_config(config)
 
     weights = {}
