@@ -24,6 +24,8 @@ class LLM():
                  args: ModelArgs) -> None:
         self.args = args
         self.model = self._get_model_class(args.model_type)(args)
+        # logger.info(f"Model initialized: {self.model}")
+        self.model.tokenizer = tokenizer
         self.tokenizer = tokenizer
 
     def _get_model_class(self, name: str):
@@ -35,17 +37,22 @@ class LLM():
         
     def quantize(self,
                  group_size: int = 32,
-                 bits: int = 4,
-                 weights:dict = None):
+                 bits: int = 4):
         """Quantize model."""
-        self.model = nn.quantize(self.model, group_size=group_size, bits=bits, weights=weights)
+        assert self.model is not None, "Model is not initialized, checked before quantizing"
+        nn.quantize(self.model, group_size=group_size, bits=bits)
+        assert self.model is not None, "Model is not initialized, checked after quantizing"
+        
 
     def verify_weights(self, 
                        weights: dict):
         """Verify weights."""
+        if self.model is None:
+            raise ValueError("Model is not initialized")
         model_params = tree_flatten(self.model.parameters())
         result = True
 
+        logger.info(f"weight keys: {weights.keys()}")
         for name, weight in model_params:
             if name not in weights:
                 result = False
@@ -64,6 +71,8 @@ class LLM():
     
     def get_size(self):
         """Get size."""
+        if self.model is None:
+            raise ValueError("Model is not initialized")
         pp_flat = tree_flatten(self.model.parameters()) # each element in the list is [name, tensor]
         params = sum([p[1].size for p in pp_flat])
 
@@ -72,6 +81,8 @@ class LLM():
     def update_weights(self,
                        weights: dict):
         """Update weights."""
+        if self.model is None:
+            raise ValueError("Model is not initialized")
         weights = tree_unflatten(list(weights.items()))
         self.model.update(weights)
         mx.eval(self.model.parameters())

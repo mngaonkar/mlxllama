@@ -56,6 +56,7 @@ def load_model_file(model_path: str) -> LLM:
 def load_gguf_file(model_path: pathlib.Path) -> LLM:
     logger.info(f"Loading GGUF model from {model_path}...")
     gguf_weigthts, metadata = mx.load(model_path, return_metadata=True)
+    logger.info(f"metadata: {metadata.keys()}")
 
     config = map_config(metadata)
     config['model_path'] = str(model_path)
@@ -101,11 +102,11 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
     logger.info(f"Model loaded with {model_args}")
 
     if quantization is not None:
-        logger.info("Quantizing model...")
-        model.quantize(group_size=quantization["group_size"], bits=quantization["bits"], weights=weights)
+        logger.info(f'Quantizing model group_size = {quantization["group_size"]} bits = {quantization["bits"]}')
+        model.quantize(group_size=quantization["group_size"], bits=quantization["bits"])
 
     model.verify_weights(weights)
-    model.update_weights(weights, mapping=mapping)
+    model.update_weights(weights)
 
     total_params = model.get_size()
     logger.info(f"Model loaded with {total_params/10**9:.2f}B parameters.")

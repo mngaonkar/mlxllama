@@ -40,8 +40,7 @@ class Model(BaseModel):
         self.layers = [TransformerBlock(args=args) for _ in range(args.n_layers)]
         self.norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
         self.model_path = args.model_path
-        self.tokenizer = SentencePieceProcessor(model_file=str(self.model_path / "tokenizer.model"))
-
+       
         if args.tie_word_embeddings:
             self.output = None
         else:
