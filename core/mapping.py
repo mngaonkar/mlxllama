@@ -1,8 +1,12 @@
 import mlx.core as mx
 import re
 
+from core.llm import logger
+
 def map_key(key: str) -> str:
-    if key.startswith("layers."):
+    """map GGUF key to MLX"""
+    logger.info(f"key = {key}")
+    if key.startswith("layers"):
         return key
     elif key.startswith("output."):
         return key
@@ -31,8 +35,8 @@ def map_key(key: str) -> str:
         return key
     elif key.startswith("output_norm."):
         return re.sub(r"^output_norm\.", "norm.", key)
-    elif key.startswith("token_embed."):
-        return re.sub(r"^token_embed\.", "tok_embeddings.", key)
+    elif key.startswith("token_embd."):
+        return re.sub(r"^token_embd\.", "tok_embeddings.", key)
     elif key.startswith("blk."):
         layer = key.split(".")[1]
         key = re.sub(r"^blk\.", "layers.", key)
@@ -40,9 +44,21 @@ def map_key(key: str) -> str:
         if key.endswith(".attn_norm.weight"):
             return f"layers.{layer}.attention_norm.weight"
         elif key.endswith(".ffn_norm.weight"):
-            return f"layers.{layer}.ffn_norm.weight"
-        
-        key = re.sub(r"\.attn\.(k|v|q)\.", r".attention.w\1.", key)
+            return f"layers.{layer}.ff_norm.weight"
+        elif ".ffn_gate" in key:
+            return re.sub(r"ffn_gate", "feed_forward.w1", key)
+        elif ".ffn_down" in key:
+            return re.sub(r"ffn_down", "feed_forward.w2", key)
+        elif ".ffn_up" in key:
+            return re.sub(r"ffn_up", "feed_forward.w3", key)
+        elif key.endswith(".attn_q.weight"):
+            return f"layers.{layer}.attention.wq.weight"
+        elif key.endswith(".attn_q.scales"):
+            return f"layers.{layer}.attention.wq.scales"
+        elif key.endswith(".attn_q.biases"):
+            return f"layers.{layer}.attention.wq.biases"
+
+        key = re.sub(r"\.attn\_(k|v|q)\.", r".attention.w\1.", key)
         key = re.sub(r"\.attn_output\.", r".attention.wo.", key)
 
         return key
