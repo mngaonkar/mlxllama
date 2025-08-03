@@ -56,12 +56,12 @@ class Model(BaseModel):
         if h.shape[1] > 1:
             mask = nn.MultiHeadAttention.create_additive_causal_mask(h.shape[1]).astype(h.dtype)
 
-        if cache is None:
-            cache = [None] * self.n_layers
+        # if cache is None:
+        #     cache = [KVCache(self.args.head_dim, self.args.n_kv_heads)] * self.n_layers
 
-        logger.info(f"Cache: {cache}")
+        # logger.info(f"Cache: {cache}")
         for i, layer in enumerate(self.layers):
-            h = layer.forward(h, mask, cache[i])
+            h = layer.forward(h, mask, cache)
         
         if self.output is None:
             return self.tok_embeddings.as_linear(self.norm(h))
@@ -92,7 +92,7 @@ class Attention(nn.Module):
                  cache: Optional[KVCache] = None) -> mx.array:
         """Forward pass."""
         mx.eval(input)
-        logger.info(f"input shape: {input.shape}")
+        # logger.info(f"input shape: {input.shape}")
         B, L, D = input.shape
 
         queries, keys, values = self.wq(input), self.wk(input), self.wv(input)

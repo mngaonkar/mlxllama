@@ -9,10 +9,51 @@ import mlx.nn as nn
 from mlx.utils import tree_flatten, tree_unflatten
 import models.llama
 import numpy as np
-from mlx_lm import sample_utils
+from mlx_lm.sample_utils import apply_top_p
+
+# from mlx_lm import sample_utils
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+def top_k_sampling(logits, top_k: int):
+    """Apply top-k sampling to logits."""
+    # Get the top k logit values and indices
+    top_logits, top_indices = mx.topk(logits, top_k, axis=-1)
+    
+    # Create a mask for values not in top-k
+    mask = mx.full_like(logits, float('-inf'))
+    mask = mask.at[..., top_indices].set(top_logits)
+    
+    return mask
+
+def top_p_sampling(logits, top_p: float):
+    """Apply nucleus (top-p) sampling to logits."""
+    # Sort logits in descending order
+    sorted_logits = mx.sort(logits, axis=-1)[:, ::-1]
+    sorted_indices = mx.argsort(logits, axis=-1)[:, ::-1]
+    
+    # Convert to probabilities
+    probs = mx.softmax(sorted_logits, axis=-1)
+    
+    # Calculate cumulative probabilities
+    cumulative_probs = mx.cumsum(probs, axis=-1)
+    
+    # Find the cutoff point
+    cutoff = cumulative_probs <= top_p
+    
+    # Keep at least one token
+    cutoff = cutoff.at[:, 0].set(True)
+    
+    # Create mask for selected tokens
+    mask = mx.full_like(logits, float('-inf'))
+    selected_logits = mx.where(cutoff, sorted_logits, float('-inf'))
+    
+    # Scatter back to original positions
+    for i in range(logits.shape[0]):
+        mask = mask.at[i, sorted_indices[i]].set(selected_logits[i])
+    
+    return mask
 
 class LLM():
     model_mapping = {
@@ -52,11 +93,11 @@ class LLM():
         model_params = tree_flatten(self.model.parameters())
         result = True
 
-        logger.info(f"weight keys: {weights.keys()}")
+        # logger.info(f"GGUF weight keys: {weights.keys()}")
         for name, weight in model_params:
             if name not in weights:
                 result = False
-                logger.warning(f"Weight {name} not found in weights.")
+                logger.warning(f"MLX weight key {name} not found in GGUF weights.")
             elif weight.shape != weights[name].shape:
                 result = False
                 logger.warning(f"Shape mismatch for {name}: {weight.shape} != {weights[name].shape}")
@@ -65,7 +106,7 @@ class LLM():
         for name in weights:
             if name not in model_keys:
                 result = False
-                logger.warning(f"Weight {name} not found in model.")
+                logger.warning(f"GGUF weight key {name} not found in MLX model.")
         
         return result
     
@@ -116,8 +157,9 @@ def generate(model,
     start = time.perf_counter()
     logger.info("Generating text...")
     encoded = tokenizer.encode(prompt)
-    if not encoded:
-        raise ValueError("Failed to encode prompt or prompt is empty")
+    logger.info(f"encoded: {encoded}")
+    # if not encoded:
+    #     raise ValueError("Failed to encode prompt or prompt is empty")
     inputs = mx.array(encoded)
     logger.info(f"input encoded length: {len(inputs)}")
     logger.info(f"input encoded: {inputs}")
@@ -142,10 +184,12 @@ def generate(model,
                     logits[0, token] = logits[0, token] / repetition_penalty
             
             if top_k > 0:
-                logits = sample_utils.top_k_sampling(logits, top_k=top_k)
+                logits = mx.topk(logits, top_k)
 
-            if top_p > 0.0:
-                logits = sample_utils.top_p_sampling(logits, top_p=top_p, temperature=temperature)
+            # TODO: fix top_p sampling
+            # if top_p > 0.0:
+            #     logits = mx.topk(logits, top_p)
+            logits = apply_top_p(logits, top_p=top_p)
 
             y = mx.random.categorical(logits)
 
@@ -166,8 +210,8 @@ def generate(model,
             logger.debug("Cache miss.")
             cache = KVCache(model.args.head_dim, model.args.n_kv_heads)
             logits = model(inputs[None], cache)
-            logger.debug(f"logits shape: {logits.shape}")
-            logger.debug(f"logits: {logits}")
+            # logger.debug(f"logits shape: {logits.shape}")
+            # logger.debug(f"logits: {logits}")
 
             logits = logits[:, -1, :]
 
@@ -178,15 +222,15 @@ def generate(model,
 
         while True:
             logits = model(y[None], cache)
-            logger.debug(f"logits shape: {logits.shape}")
-            logger.debug(f"logits: {logits}")
+            # logger.debug(f"logits shape: {logits.shape}")
+            # logger.debug(f"logits: {logits}")
             logits = logits[:, -1, :]
 
             y, p = sample(logits)
             yield y, p
     
     for (token, p), i in zip(generate_step(model, inputs), range(max_tokens)):
-        logger.debug(f"Token: {token.item()}, p: {p}, i: {i}")
+        # logger.debug(f"Token: {token.item()}, p: {p}, i: {i}")
 
         if i == 0:
             mx.eval(token)
@@ -195,7 +239,7 @@ def generate(model,
             break
         
         tokens.append(token.item())
-        logger.debug(f"Token appended: {token.item()}")
+        # logger.debug(f"Token appended: {token.item()}")
         if (len(tokens) % flush) == 0:
             mx.eval(tokens)
             text_offset = len(text)

@@ -55,7 +55,7 @@ def load_model_file(model_path: str) -> LLM:
     
 def load_gguf_file(model_path: pathlib.Path) -> LLM:
     logger.info(f"Loading GGUF model from {model_path}...")
-    gguf_weigthts, metadata = mx.load(model_path, return_metadata=True)
+    gguf_weights, metadata = mx.load(model_path, return_metadata=True)
     logger.info(f"metadata: {metadata.keys()}")
 
     config = map_config(metadata)
@@ -68,7 +68,7 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
 
     # Map keys
     logger.info("Mapping keys...")
-    for k, v in gguf_weigthts.items():
+    for k, v in gguf_weights.items():
         mlx_key = map_key(k)
         mapping[mlx_key] = k    
 
@@ -76,6 +76,10 @@ def load_gguf_file(model_path: pathlib.Path) -> LLM:
             logger.warning(f"Skipping key {k}")
         else:
             weights[mlx_key] = v
+
+    # Print mapped keys
+    for key, value in mapping.items():
+        logger.info(f"Mapped keys: MLX key = {key} GGUF key = {value}")
 
     # Load quantization
     gguf_file_type = metadata.get("general.file_type", "unknown")
