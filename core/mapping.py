@@ -35,8 +35,8 @@ def map_key(key: str) -> str:
         return key
     elif key.startswith("output_norm."):
         return re.sub(r"^output_norm\.", "norm.", key)
-    elif key.startswith("token_embd."):
-        return re.sub(r"^token_embd\.", "tok_embeddings.", key)
+    # elif key.startswith("token_embd."):
+    #     return re.sub(r"^token_embd\.", "tok_embeddings.", key)
     elif key.startswith("blk."):
         layer = key.split(".")[1]
         key = re.sub(r"^blk\.", "layers.", key)

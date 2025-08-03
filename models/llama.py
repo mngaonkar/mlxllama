@@ -1,6 +1,7 @@
 from typing import Optional
 import mlx.core as mx
 import mlx.nn as nn
+from numpy import dtype, uint32
 from models.args import ModelArgs
 from models.activation import init_activation
 from models.rope import init_rope
@@ -36,7 +37,9 @@ class Model(BaseModel):
         self.args = args
         self.n_layers = args.n_layers
         self.vocab_size = args.vocab_size
+        logger.info(f"embedding size = {args.dim}")
         self.tok_embeddings = nn.Embedding(args.vocab_size, args.dim)
+        logger.info(f"tok_embeddings shape = {self.tok_embeddings.weight.shape}")
         self.layers = [TransformerBlock(args=args) for _ in range(args.n_layers)]
         self.norm = nn.RMSNorm(args.dim, eps=args.norm_eps)
         self.model_path = args.model_path
@@ -45,11 +48,13 @@ class Model(BaseModel):
             self.output = None
         else:
             self.output = nn.Linear(args.dim, args.vocab_size, bias=False)
+        logger.info(f"output shape = {self.output.weight.shape}")
 
     def __call__(self, 
                  input: mx.array,
                  cache = None):
         """Forward pass."""
+        logger.info(f"input = {input}")
         h = self.tok_embeddings(input)
         mask = None
 

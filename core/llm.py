@@ -91,6 +91,8 @@ class LLM():
         if self.model is None:
             raise ValueError("Model is not initialized")
         model_params = tree_flatten(self.model.parameters())
+        for name, param in model_params:
+            logger.info(f"model_params name = {name} shape = {param.shape}")
         result = True
 
         # logger.info(f"GGUF weight keys: {weights.keys()}")
